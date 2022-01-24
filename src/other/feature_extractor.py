@@ -1,7 +1,7 @@
 import multiprocessing
 import os
 import random
-
+import math
 import cv2 as cv
 import numpy as np
 import pandas as pd
@@ -77,8 +77,19 @@ def gen_hof(x, y, frame, next_frame):
     p1, st, err = cv.calcOpticalFlowPyrLK(frame, next_frame, neighbors, None, **lk_params)
 
     for i in range(len(p1)):
-        direction = np.arctan(p1[i].T[0] / p1[i].T[1])
-        histogram = util.gen_arc_histogram(direction, histogram)
+        if st[i]:
+            dx = (p1[i].T[0] - neighbors[i].T[0])
+            dy = -(p1[i].T[1] - neighbors[i].T[1])
+            direction = np.arctan(dy / dx)
+            if dx < 0 < dy:
+                direction = math.pi + direction
+            if dx < 0 and dy < 0:
+                direction = math.pi + direction
+            if dx > 0 > dy:
+                direction = (2 * math.pi) + direction
+            direction = direction * 180 / math.pi
+            histogram = util.gen_arc_histogram(direction, histogram)
+
         if i in util.cells:
             hof += histogram
             histogram = [0, 0, 0, 0, 0, 0, 0, 0]
