@@ -98,12 +98,16 @@ def gen_hof(x, y, frame, next_frame):
 
 
 def gen_mosift_features(video_path, lambda_value, interval, sample_size):
-    frames = count_frames(video_path)
+    cap = cv.VideoCapture(video_path)
+    frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
     mosift_descriptors = []
 
     for i in range(1, frames - 1, interval):
-        ret, frame = capture_frame(video_path, i)
-        ret, next_frame = capture_frame(video_path, i + 1)
+        cap.set(1, i)
+        _, frame = cap.read()
+        cap.set(1, i + 1)
+        _, next_frame = cap.read()
+
         key_points, descriptors = gen_sift_features(frame)
         if len(key_points) == 0:
             continue
@@ -124,10 +128,9 @@ def gen_mosift_features(video_path, lambda_value, interval, sample_size):
 
 def run_feature_extractor(input_path, output_path, lambda_value, interval, dict_directory, sample_size):
     listing = os.listdir(input_path)
-    progress_count = 0
-    for video_name in listing:
-        progress_count += 1
-        print("# progress: " + str(progress_count) + '/' + str(len(listing)))
+
+    def inner_call(count, video_name):
+        print("# progress: " + str(count) + '/' + str(len(listing)))
         video_path = input_path + video_name
 
         if dict_directory:
@@ -136,6 +139,9 @@ def run_feature_extractor(input_path, output_path, lambda_value, interval, dict_
         else:
             df_mosift_features = pd.DataFrame(gen_mosift_features(video_path, lambda_value, interval, sample_size))
             df_mosift_features.to_csv(output_path + video_name[:-4] + ".csv", mode='a', header=False, index=False)
+
+    Parallel(n_jobs=int(multiprocessing.cpu_count()))(
+        delayed(inner_call)(count, video_name) for count, video_name in enumerate(listing))
 
 
 if __name__ == '__main__':
@@ -152,5 +158,5 @@ if __name__ == '__main__':
              (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/walking/",
               r"/home/alireza/projects/python/MoSIFT/dataset/csv/walking/")]
 
-    Parallel(n_jobs=int(multiprocessing.cpu_count()))(
-        delayed(run_feature_extractor)(path, target, 0.7, 1, False, 0.2) for path, target in paths)
+    for path, target in paths:
+        run_feature_extractor(path, target, 0.7, 1, False, 0.2)
