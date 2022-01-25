@@ -119,7 +119,8 @@ def gen_mosift_features(video_path, lambda_value, interval, sample_size):
 
         for j in range(len(sm_key_points)):
             hof = np.array(gen_hof(sm_key_points_xy[j][0], sm_key_points_xy[j][1], frame, next_frame))
-            mosift_descriptors.append(list(np.concatenate((sm_descriptors[j], hof))))
+            spatio_temporal_info = [sm_key_points_xy[j][0], sm_key_points_xy[j][1], i]
+            mosift_descriptors.append(list(np.concatenate((sm_descriptors[j], hof, spatio_temporal_info))))
 
     random_mosift_descriptors = random.sample(mosift_descriptors, k=int(len(mosift_descriptors) * sample_size))
 
@@ -148,15 +149,15 @@ if __name__ == '__main__':
     paths = [(r"/home/alireza/projects/python/MoSIFT/dataset/KTH/running/",
               r"/home/alireza/projects/python/MoSIFT/dataset/csv/running/"),
              (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/boxing/",
-              r"/home/alireza/projects/python/MoSIFT/dataset/csv/boxing/"),
-             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handclapping/",
-              r"/home/alireza/projects/python/MoSIFT/dataset/csv/handclapping/"),
-             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handwaving/",
-              r"/home/alireza/projects/python/MoSIFT/dataset/csv/handwaving/"),
-             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/jogging/",
-              r"/home/alireza/projects/python/MoSIFT/dataset/csv/jogging/"),
-             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/walking/",
-              r"/home/alireza/projects/python/MoSIFT/dataset/csv/walking/")]
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/boxing/")]
+             # (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handclapping/",
+             #  r"/home/alireza/projects/python/MoSIFT/dataset/csv/handclapping/"),
+             # (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handwaving/",
+             #  r"/home/alireza/projects/python/MoSIFT/dataset/csv/handwaving/"),
+             # (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/jogging/",
+             #  r"/home/alireza/projects/python/MoSIFT/dataset/csv/jogging/"),
+             # (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/walking/",
+             #  r"/home/alireza/projects/python/MoSIFT/dataset/csv/walking/")]
 
     for path, target in paths:
         run_feature_extractor(path, target, 0.7, 1, False, 0.2)
