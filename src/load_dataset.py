@@ -4,7 +4,8 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 
-categories = ["boxing", "running"]
+# categories = ["boxing", "running"]
+categories = ["boxing", "running", "handclapping", "handwaving", "jogging", "walking"]
 root = "/home/alireza/projects/python/MoSIFT/"
 base_path = root + "dataset/KTH/"
 base_feature_path = root + "dataset/csv/"
@@ -35,9 +36,10 @@ def load_feature(category: str):
     temp_path = base_feature_path + category + "/"
     files = os.listdir(temp_path)
     count = 0
-    for file in files[0:3]:
+    for file in files:
         print(temp_path + file)
         temp_df = pd.read_csv(temp_path + file, header=None)
+        temp_df[259] = count
         dataset = dataset.append(temp_df)
         count += 1
 
@@ -58,11 +60,12 @@ def load_all():
 
 
 def load_all_features():
-    dataset = []
+    dataset = pd.DataFrame()
     label = []
     for index, temp in enumerate(categories):
         temp_dataset, count = load_feature(temp)
-        dataset.append(temp_dataset)
+        temp_dataset[260] = index
+        dataset = dataset.append(temp_dataset)
         label.append(np.array([index] * count))
 
     label = np.array(label)
