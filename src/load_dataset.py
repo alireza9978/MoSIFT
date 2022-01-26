@@ -38,6 +38,7 @@ def load_feature(category: str):
     for file in files[0:3]:
         print(temp_path + file)
         temp_df = pd.read_csv(temp_path + file, header=None)
+        temp_df[259] = count
         dataset = dataset.append(temp_df)
         count += 1
 
@@ -58,11 +59,12 @@ def load_all():
 
 
 def load_all_features():
-    dataset = []
+    dataset = pd.DataFrame()
     label = []
     for index, temp in enumerate(categories):
         temp_dataset, count = load_feature(temp)
-        dataset.append(temp_dataset)
+        temp_dataset[260] = index
+        dataset = dataset.append(temp_dataset)
         label.append(np.array([index] * count))
 
     label = np.array(label)
