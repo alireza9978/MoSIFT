@@ -3,15 +3,10 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 
 from src.load_dataset import load_all_features
-
-
-def clustering(input_data, n_clusters, batch_size):
-    model = MiniBatchKMeans(n_clusters=n_clusters, batch_size=batch_size).fit(input_data)
-    return model
 
 
 def gen_histogram(temp_df: pd.DataFrame):
@@ -90,12 +85,16 @@ if __name__ == '__main__':
     data_frame.drop(columns=[256, 257, 258, 259, 260], inplace=True)
     data_frame.fillna(data_frame.mean(), inplace=True)
 
-    # kmeans_model = clustering(data_frame, 200, 32)
-    # word_label = kmeans_model.predict(data_frame)
-    # np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
-    word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
+    print("# data loaded")
 
-    print("# clustering ended")
+    # kmeans_model = MiniBatchKMeans(n_clusters=200, batch_size=64).fit(data_frame)
+    # clustering_model = DBSCAN().fit(data_frame)
+    clustering_model = KMeans(n_clusters=500).fit(data_frame)
+    word_label = clustering_model.predict(data_frame)
+    np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
+    # word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
+
+    print("# clustered")
 
     spatio_temporal_df = spatio_temporal_df.reset_index(drop=True)
     spatio_temporal_df["prediction"] = pd.Series(word_label, index=spatio_temporal_df.index)
