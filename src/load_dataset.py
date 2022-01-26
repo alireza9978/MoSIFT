@@ -6,7 +6,8 @@ import pandas as pd
 
 # categories = ["boxing", "running"]
 categories = ["boxing", "running", "handclapping", "handwaving", "jogging", "walking"]
-root = "/home/alireza/projects/python/MoSIFT/"
+# root = "/home/alireza/projects/python/MoSIFT/"
+root = "E:\MoSIFT/"
 base_path = root + "dataset/KTH/"
 base_feature_path = root + "dataset/csv/"
 
