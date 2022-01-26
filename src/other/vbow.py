@@ -1,7 +1,12 @@
+import multiprocessing
+
+from joblib import Parallel, delayed
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.metrics import pairwise_distances
 import numpy as np
 import pandas as pd
 import glob
+import math
 import os
 
 from src.load_dataset import load_all_features
@@ -41,9 +46,37 @@ def gen_vbow(input_path, output_name, kmeans_model, class_id):
     # np.savetxt(output_name+".csv", vbow, delimiter=",")
 
 
+def get_adjacency_matrix(temp_df: pd.DataFrame):
+    temp_labels = temp_df["word_label"]
+    result = pairwise_distances(temp_df.drop(columns=[259, 260, "word_label"]), metric=word_neighbor, n_jobs=1)
+    result = result[~np.eye(result.shape[0], dtype=bool)].reshape(result.shape[0], -1)
+    x, y = np.where(result == 1)
+    result_df = pd.DataFrame({"from": temp_labels[x].values, "to": temp_labels[y].values})
+    result_df["video"] = temp_df[259].values[0]
+    result_df["category"] = temp_df[260].values[0]
+    return result_df
+
+
+def word_neighbor(x, y):
+    temp_d = np.abs(x - y)
+    if temp_d[0] < 5 and temp_d[1] < 5 and temp_d[2] < 60:
+        return 1
+    else:
+        return 0
+
+
 if __name__ == '__main__':
-    data_frame = load_all_features()
+    data_frame, labels = load_all_features()
+    spatio_temporal_df = data_frame[[256, 257, 258, 259, 260]]
+    data_frame.drop(columns=[256, 257, 258, 259, 260], inplace=True)
     data_frame.fillna(data_frame.mean(), inplace=True)
     kmeans_model = clustering(data_frame, 500, 32)
+    word_label = kmeans_model.predict(data_frame)
     print("# clustering ended")
-
+    spatio_temporal_df.loc[:, "word_label"] = word_label
+    matrix = spatio_temporal_df.groupby([259, 260], group_keys=False).apply(get_adjacency_matrix)
+    tf = matrix.groupby(["from", "to"]).count()
+    idf = matrix.groupby(["from", "to", "video", "category"]).sum()
+    print(matrix)
+    # Parallel(n_jobs=int(multiprocessing.cpu_count()))(
+    #     delayed(get_adjacency_matrix)(group) for group, name in spatio_temporal_df.groupby(columns=[259]))
