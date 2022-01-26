@@ -80,6 +80,8 @@ def gen_hof(x, y, frame, next_frame):
         if st[i]:
             dx = (p1[i].T[0] - neighbors[i].T[0])
             dy = -(p1[i].T[1] - neighbors[i].T[1])
+            if dx == 0:
+                dx = 0.00001
             direction = np.arctan(dy / dx)
             if dx < 0 < dy:
                 direction = math.pi + direction
@@ -141,7 +143,7 @@ def run_feature_extractor(input_path, output_path, lambda_value, interval, dict_
             df_mosift_features = pd.DataFrame(gen_mosift_features(video_path, lambda_value, interval, sample_size))
             df_mosift_features.to_csv(output_path + video_name[:-4] + ".csv", mode='a', header=False, index=False)
 
-    Parallel(n_jobs=int(multiprocessing.cpu_count()))(
+    Parallel(n_jobs=int(multiprocessing.cpu_count() - 5))(
         delayed(inner_call)(count, video_name) for count, video_name in enumerate(listing))
 
 
