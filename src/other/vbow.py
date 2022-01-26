@@ -58,8 +58,8 @@ def get_adjacency_matrix(temp_df: pd.DataFrame):
 
 
 def word_neighbor(x, y):
-    temp_d = np.abs(x - y)
-    if temp_d[0] < 5 and temp_d[1] < 5 and temp_d[2] < 60:
+    temp_d = x - y
+    if np.abs(temp_d[0]) <= 5 and np.abs(temp_d[1]) <= 5 and 0 <= temp_d[2] <= 60:
         return 1
     else:
         return 0
@@ -75,8 +75,24 @@ if __name__ == '__main__':
     print("# clustering ended")
     spatio_temporal_df.loc[:, "word_label"] = word_label
     matrix = spatio_temporal_df.groupby([259, 260], group_keys=False).apply(get_adjacency_matrix)
-    tf = matrix.groupby(["from", "to"]).count()
-    idf = matrix.groupby(["from", "to", "video", "category"]).sum()
+    tf = matrix.groupby(["from", "to"]).size()
+
+    def vectorise(temp_list):
+        result = temp_list[["from", "to"]].groupby(["from", "to"]).size().reset_index()
+        return result[["from", "to"]]
+
+    df = matrix.groupby(["video", "category"]).apply(vectorise)
+    df = df.reset_index().drop(columns=["level_2"])
+    df = df.groupby(["from", "to"]).size()
+    tf_idf_matrix = matrix.set_index(["from", "to"])
+    tf_idf_matrix["tf"] = tf
+    tf_idf_matrix = tf_idf_matrix.reset_index().set_index(["from", "to", "video", "category"])
+    tf_idf_matrix["df"] = df
+    tf_idf_matrix = tf_idf_matrix.reset_index()
+    tf_idf_matrix["tf_idf"] = tf_idf_matrix["tf"] / tf_idf_matrix["df"]
+    tf_idf_matrix = tf_idf_matrix[["from", "to", "tf_idf"]].groupby(["from", "to"]).first().reset_index()
+    tf_idf_matrix = tf_idf_matrix.sort_values("tf_idf", ascending=False)
+
     print(matrix)
     # Parallel(n_jobs=int(multiprocessing.cpu_count()))(
     #     delayed(get_adjacency_matrix)(group) for group, name in spatio_temporal_df.groupby(columns=[259]))
