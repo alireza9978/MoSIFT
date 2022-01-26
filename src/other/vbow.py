@@ -22,28 +22,11 @@ def clustering(input_data, n_clusters, batch_size):
     return model
 
 
-def gen_histogram(feature_vectors, kmeans_model):
-    histogram = np.zeros(len(kmeans_model.cluster_centers_))
-    cluster_result = kmeans_model.predict(feature_vectors)
-    for i in cluster_result:
-        histogram[i] += 1.0
-    return histogram
-
-
-def gen_vbow(input_path, output_name, kmeans_model, class_id):
-    vbow = []
-    listing = glob.glob(input_path + "*.csv")
-    for csv_name in listing:
-        try:
-            feature_vectors = pd.read_csv(input_path + csv_name.split('\\')[1])
-            histogram = gen_histogram(feature_vectors, kmeans_model)
-            histogram = np.append(histogram, class_id)
-            vbow.append(histogram)
-        except:
-            print('Exception in ' + input_path + csv_name)
-    df = pd.DataFrame(vbow, columns=cols)
-    df.to_csv(output_name + listing[0].split('/')[2].split('\\')[0] + ".csv", index=False)
-    # np.savetxt(output_name+".csv", vbow, delimiter=",")
+def gen_histogram(temp_df: pd.DataFrame):
+    histogram = np.zeros(500)
+    for k in temp_df["prediction"]:
+        histogram[k] += 1.0
+    return pd.Series(histogram)
 
 
 def get_adjacency_matrix(temp_df: pd.DataFrame):
@@ -72,14 +55,21 @@ if __name__ == '__main__':
     data_frame.fillna(data_frame.mean(), inplace=True)
     kmeans_model = clustering(data_frame, 500, 32)
     word_label = kmeans_model.predict(data_frame)
+
+    spatio_temporal_df["prediction"] = word_label
+    vector_bag_of_word_histogram = spatio_temporal_df[[259, 260, "prediction"]].groupby(
+        [259, 260]).apply(gen_histogram)
+
     print("# clustering ended")
     spatio_temporal_df.loc[:, "word_label"] = word_label
     matrix = spatio_temporal_df.groupby([259, 260], group_keys=False).apply(get_adjacency_matrix)
     tf = matrix.groupby(["from", "to"]).size()
 
+
     def vectorise(temp_list):
         result = temp_list[["from", "to"]].groupby(["from", "to"]).size().reset_index()
         return result[["from", "to"]]
+
 
     df = matrix.groupby(["video", "category"]).apply(vectorise)
     df = df.reset_index().drop(columns=["level_2"])
@@ -92,6 +82,7 @@ if __name__ == '__main__':
     tf_idf_matrix["tf_idf"] = tf_idf_matrix["tf"] / tf_idf_matrix["df"]
     tf_idf_matrix = tf_idf_matrix[["from", "to", "tf_idf"]].groupby(["from", "to"]).first().reset_index()
     tf_idf_matrix = tf_idf_matrix.sort_values("tf_idf", ascending=False)
+    tf_idf_matrix = tf_idf_matrix.iloc[:200][['from', "to"]].reset_index(drop=True)
 
     print(matrix)
     # Parallel(n_jobs=int(multiprocessing.cpu_count()))(
