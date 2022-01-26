@@ -16,7 +16,6 @@ def load(category: str):
     temp_path = base_path + category + "/"
     files = os.listdir(temp_path)
     for file in files[0:5]:
-        print(temp_path + file)
         capture = cv.VideoCapture(temp_path + file)
         success, image = capture.read()
         temp_video = []
@@ -37,7 +36,6 @@ def load_feature(category: str):
     files = os.listdir(temp_path)
     count = 0
     for file in files:
-        print(temp_path + file)
         temp_df = pd.read_csv(temp_path + file, header=None)
         temp_df[259] = count
         dataset = dataset.append(temp_df)
@@ -61,14 +59,13 @@ def load_all():
 
 def load_all_features():
     dataset = pd.DataFrame()
-    label = []
+    label = np.array([])
     for index, temp in enumerate(categories):
         temp_dataset, count = load_feature(temp)
         temp_dataset[260] = index
         dataset = dataset.append(temp_dataset)
-        label.append(np.array([index] * count))
+        label = np.concatenate([label, np.array([index] * count)])
 
-    label = np.array(label)
     return dataset, label
 
 
