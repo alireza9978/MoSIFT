@@ -52,9 +52,11 @@ def inner_generate_bi_gram_histogram(temp_df: pd.DataFrame):
 
 def generate_bi_gram_histogram(temp_spatio_temporal_df):
     adjacency_matrix = apply_parallel(temp_spatio_temporal_df.groupby([259, 260]), get_adjacency_matrix)
+    # adjacency_matrix = temp_spatio_temporal_df.groupby([259, 260]).apply(get_adjacency_matrix)
     tf = adjacency_matrix.groupby(["from", "to"]).size()
 
     df = apply_parallel(adjacency_matrix.groupby(["video", "category"]), vectorise)
+    # df = adjacency_matrix.groupby(["video", "category"]).apply(vectorise)
     df = df.groupby(["from", "to"]).size()
     tf_idf_matrix = adjacency_matrix.set_index(["from", "to"])
     tf_idf_matrix["tf"] = tf
@@ -77,7 +79,7 @@ def generate_bi_gram_histogram(temp_spatio_temporal_df):
 
 
 def apply_parallel(data_frame_grouped, func):
-    result_list = Parallel(n_jobs=int(multiprocessing.cpu_count()))(
+    result_list = Parallel(n_jobs=int(multiprocessing.cpu_count() - 5))(
         delayed(func)(group) for name, group in data_frame_grouped)
     return pd.concat(result_list)
 
@@ -87,8 +89,11 @@ if __name__ == '__main__':
     spatio_temporal_df = data_frame[[256, 257, 258, 259, 260]]
     data_frame.drop(columns=[256, 257, 258, 259, 260], inplace=True)
     data_frame.fillna(data_frame.mean(), inplace=True)
-    kmeans_model = clustering(data_frame, 500, 32)
-    word_label = kmeans_model.predict(data_frame)
+
+    # kmeans_model = clustering(data_frame, 200, 32)
+    # word_label = kmeans_model.predict(data_frame)
+    # np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
+    word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
 
     print("# clustering ended")
 
