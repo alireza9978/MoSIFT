@@ -3,7 +3,7 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics import pairwise_distances
 
 from src.load_dataset import load_all_features
@@ -87,13 +87,11 @@ if __name__ == '__main__':
 
     print("# data loaded")
 
-    # kmeans_model = MiniBatchKMeans(n_clusters=200, batch_size=64).fit(data_frame)
-    # clustering_model = DBSCAN().fit(data_frame)
-    clustering_model = KMeans(n_clusters=500).fit(data_frame)
+    clustering_model = MiniBatchKMeans(n_clusters=200, batch_size=32)
+    clustering_model.fit(data_frame)
     word_label = clustering_model.predict(data_frame)
     np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
     # word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
-
     print("# clustered")
 
     spatio_temporal_df = spatio_temporal_df.reset_index(drop=True)
@@ -108,5 +106,6 @@ if __name__ == '__main__':
 
     print("# Histogram of bi-gram words")
 
+    vector_bag_of_word_histogram.index.rename(["video", "category"], inplace=True)
     final_df = vector_bag_of_word_histogram.join(bi_gram_histogram).fillna(0)
     final_df.reset_index().to_csv("../../dataset/final_features.csv", header=None, index=None)
