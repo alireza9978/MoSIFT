@@ -41,7 +41,7 @@ def load_feature(category: str):
     count = 0
     for file in files:
         temp_df = pd.read_csv(temp_path + file, header=None)
-        temp_df[259] = count
+        temp_df["video"] = count
         dataset = dataset.append(temp_df)
         count += 1
 
@@ -65,7 +65,7 @@ def load_all_features():
     label = np.array([])
     for index, temp in enumerate(categories):
         temp_dataset, count = load_feature(temp)
-        temp_dataset[260] = index
+        temp_dataset["category"] = index
         dataset = dataset.append(temp_dataset)
         label = np.concatenate([label, np.array([index] * count)])
 
