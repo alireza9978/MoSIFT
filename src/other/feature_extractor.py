@@ -1,19 +1,14 @@
-import multiprocessing
-import os
-import random
 import math
+import multiprocessing
+import random
+
 import cv2 as cv
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
 import util
-
-# params for ShimTomasi corner detection
-feature_params = dict(maxCorners=100,
-                      qualityLevel=0.3,
-                      minDistance=7,
-                      blockSize=7)
+from src.load_dataset import load_all, get_saving_file_name
 
 # params for Lucas Kanade optical flow
 lk_params = dict(winSize=(15, 15),
@@ -84,22 +79,18 @@ def gen_hof(x, y, frame, next_frame):
     return hof
 
 
-def gen_mosift_features(video_path, lambda_value, interval, sample_size):
-    cap = cv.VideoCapture(video_path)
-    frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+def gen_mosift_features(video_data, lambda_value, interval, sample_size):
+    frames = video_data.shape[0]
     mosift_descriptors = []
 
     for i in range(1, frames - 1, interval):
-        cap.set(1, i)
-        _, frame = cap.read()
-        cap.set(1, i + 1)
-        _, next_frame = cap.read()
+        frame = video_data[i]
+        next_frame = video_data[i + 1]
 
         key_points, descriptors = gen_sift_features(frame)
         if len(key_points) == 0:
             continue
-        key_points_xy = key_points_to_coordinates(key_points)
-        key_points_xy = np.float32(np.array(key_points_xy)[:, np.newaxis, :])
+        key_points_xy = cv.KeyPoint_convert(key_points)
         p1, st, err = cv.calcOpticalFlowPyrLK(frame, next_frame, key_points_xy, None, **lk_params)
         sm_key_points_xy, sm_key_points, sm_descriptors = has_sufficient_motion(key_points_xy, key_points, descriptors,
                                                                                 p1, lambda_value)
@@ -114,49 +105,21 @@ def gen_mosift_features(video_path, lambda_value, interval, sample_size):
     return random_mosift_descriptors
 
 
-def run_feature_extractor(input_path, output_path, lambda_value, interval, dict_directory, sample_size):
-    listing = os.listdir(input_path)
+def run_feature_extractor():
+    lambda_value, interval, sample_size = 0.7, 1, 0.2
+    data, label = load_all()
+    total_videos = str(label.shape[0])
 
-    def inner_call(count, video_name):
-        print("# progress: " + str(count) + '/' + str(len(listing)))
-        video_path = input_path + video_name
+    def inner_call(count, video_data, video_label):
+        print("# progress: " + str(count) + '/' + total_videos)
 
-        if dict_directory:
-            df_dict = pd.DataFrame(gen_mosift_features(video_path, lambda_value, interval, sample_size))
-            df_dict.to_csv(output_path + "dict.csv", mode='a', header=False, index=False)
-        else:
-            df_mosift_features = pd.DataFrame(gen_mosift_features(video_path, lambda_value, interval, sample_size))
-            df_mosift_features.to_csv(output_path + video_name[:-4] + ".csv", mode='a', header=False, index=False)
+        df_dict = pd.DataFrame(gen_mosift_features(video_data, lambda_value, interval, sample_size))
+        df_dict.to_csv(get_saving_file_name(count, video_label), header=False, index=False)
 
-    Parallel(n_jobs=int(1))(
-        delayed(inner_call)(count, video_name) for count, video_name in enumerate(listing))
+    Parallel(n_jobs=int(multiprocessing.cpu_count() - 2))(
+        delayed(inner_call)(count, video_data_label[0], video_data_label[1]) for count, video_data_label in
+        enumerate(zip(data, label)))
 
 
 if __name__ == '__main__':
-    # paths = [(r"/home/alireza/projects/python/MoSIFT/dataset/KTH/running/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/running/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/boxing/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/boxing/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handclapping/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/handclapping/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handwaving/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/handwaving/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/jogging/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/jogging/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/walking/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/walking/")]
-    paths = [(r"E:\MoSIFT\dataset\KTH/running/",
-              r"E:\MoSIFT\dataset\csv/running/"),
-             (r"E:\MoSIFT\dataset\KTH/boxing/",
-              r"E:\MoSIFT\dataset\csv/boxing/"),
-             (r"E:\MoSIFT\dataset\KTH/handclapping/",
-              r"E:\MoSIFT\dataset\csv/handclapping/"),
-             (r"E:\MoSIFT\dataset\KTH/handwaving/",
-              r"E:\MoSIFT\dataset\csv/handwaving/"),
-             (r"E:\MoSIFT\dataset\KTH/jogging/",
-              r"E:\MoSIFT\dataset\csv/jogging/"),
-             (r"E:\MoSIFT\dataset\KTH/walking/",
-              r"E:\MoSIFT\dataset\csv/walking/")]
-
-    for path, target in paths:
-        run_feature_extractor(path, target, 0.7, 1, False, 0.2)
+    run_feature_extractor()

@@ -4,19 +4,22 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 
-# categories = ["boxing", "running"]
 categories = ["boxing", "running", "handclapping", "handwaving", "jogging", "walking"]
-# root = "/home/alireza/projects/python/MoSIFT/"
-root = "E:\MoSIFT/"
+root = "/home/alireza/projects/python/MoSIFT/"
+# root = "E:\MoSIFT/"
 base_path = root + "dataset/KTH/"
 base_feature_path = root + "dataset/csv/"
+
+
+def get_saving_file_name(count, label):
+    return base_feature_path + categories[int(label)] + "/" + str(count) + ".csv"
 
 
 def load(category: str):
     dataset = []
     temp_path = base_path + category + "/"
     files = os.listdir(temp_path)
-    for file in files[0:5]:
+    for file in files:
         capture = cv.VideoCapture(temp_path + file)
         success, image = capture.read()
         temp_video = []
@@ -46,15 +49,14 @@ def load_feature(category: str):
 
 
 def load_all():
-    dataset = []
-    label = []
+    dataset = np.array([])
+    label = np.array([])
     for index, temp in enumerate(categories):
         temp_dataset = load(temp)
-        dataset.append(temp_dataset)
-        label.append(np.array([index] * temp_dataset.shape[0]))
+        dataset = np.concatenate([dataset, temp_dataset])
+        label = np.concatenate([label, np.array([index] * temp_dataset.shape[0])])
 
     dataset = np.array(dataset)
-    label = np.array(label)
     return dataset, label
 
 
@@ -71,5 +73,5 @@ def load_all_features():
 
 
 if __name__ == '__main__':
-    # load_all()
+    print(load_all())
     print(load_all_features())
