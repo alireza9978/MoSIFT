@@ -5,8 +5,16 @@ import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
+from sklearn.metrics.pairwise import euclidean_distances
 
 from src.load_dataset import load_all_features
+
+g = 1
+
+
+def h_navid(point_a, point_b):
+    distance = euclidean_distances(point_a, point_b)
+    return np.exp(-g * distance)
 
 
 def gen_histogram(temp_df: pd.DataFrame):
@@ -19,10 +27,15 @@ def gen_histogram(temp_df: pd.DataFrame):
 def get_adjacency_matrix(temp_df: pd.DataFrame):
     temp_labels = temp_df["word_label"]
     temp_labels = temp_labels.reset_index(drop=True)
-    result = pairwise_distances(temp_df.drop(columns=[259, 260, "word_label"]), metric=word_neighbor, n_jobs=1)
+    points = temp_df.drop(columns=[259, 260, "word_label"])
+    points = points.reset_index(drop=True)
+    result = pairwise_distances(points, metric=word_neighbor, n_jobs=1)
     result = result[~np.eye(result.shape[0], dtype=bool)].reshape(result.shape[0], -1)
     x, y = np.where(result == 1)
-    result_df = pd.DataFrame({"from": temp_labels[x].values, "to": temp_labels[y].values})
+    result_df = pd.DataFrame(
+        {"from": temp_labels[x].values, "to": temp_labels[y].values, "from_pt_x": points.loc[x, 256],
+         "from_pt_y": points.loc[x, 257], "from_pt_f": points.loc[x, 258], "to_pt_x": points.loc[y, 256],
+         "to_pt_y": points.loc[y, 257], "to_pt_f": points.loc[y, 258]})
     result_df["video"] = temp_df[259].values[0]
     result_df["category"] = temp_df[260].values[0]
     return result_df

@@ -128,35 +128,35 @@ def run_feature_extractor(input_path, output_path, lambda_value, interval, dict_
             df_mosift_features = pd.DataFrame(gen_mosift_features(video_path, lambda_value, interval, sample_size))
             df_mosift_features.to_csv(output_path + video_name[:-4] + ".csv", mode='a', header=False, index=False)
 
-    Parallel(n_jobs=int(multiprocessing.cpu_count() - 5))(
+    Parallel(n_jobs=int(1))(
         delayed(inner_call)(count, video_name) for count, video_name in enumerate(listing))
 
 
 if __name__ == '__main__':
-    # paths = [(r"/home/alireza/projects/python/MoSIFT/dataset/KTH/running/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/running/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/boxing/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/boxing/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handclapping/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/handclapping/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handwaving/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/handwaving/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/jogging/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/jogging/"),
-    #          (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/walking/",
-    #           r"/home/alireza/projects/python/MoSIFT/dataset/csv/walking/")]
-    paths = [(r"E:\MoSIFT\dataset\KTH/running/",
-              r"E:\MoSIFT\dataset\csv/running/"),
-             (r"E:\MoSIFT\dataset\KTH/boxing/",
-              r"E:\MoSIFT\dataset\csv/boxing/"),
-             (r"E:\MoSIFT\dataset\KTH/handclapping/",
-              r"E:\MoSIFT\dataset\csv/handclapping/"),
-             (r"E:\MoSIFT\dataset\KTH/handwaving/",
-              r"E:\MoSIFT\dataset\csv/handwaving/"),
-             (r"E:\MoSIFT\dataset\KTH/jogging/",
-              r"E:\MoSIFT\dataset\csv/jogging/"),
-             (r"E:\MoSIFT\dataset\KTH/walking/",
-              r"E:\MoSIFT\dataset\csv/walking/")]
+    paths = [(r"/home/alireza/projects/python/MoSIFT/dataset/KTH/running/",
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/running/"),
+             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/boxing/",
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/boxing/"),
+             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handclapping/",
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/handclapping/"),
+             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/handwaving/",
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/handwaving/"),
+             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/jogging/",
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/jogging/"),
+             (r"/home/alireza/projects/python/MoSIFT/dataset/KTH/walking/",
+              r"/home/alireza/projects/python/MoSIFT/dataset/csv/walking/")]
+    # paths = [(r"E:\MoSIFT\dataset\KTH/running/",
+    #           r"E:\MoSIFT\dataset\csv/running/"),
+    #          (r"E:\MoSIFT\dataset\KTH/boxing/",
+    #           r"E:\MoSIFT\dataset\csv/boxing/"),
+    #          (r"E:\MoSIFT\dataset\KTH/handclapping/",
+    #           r"E:\MoSIFT\dataset\csv/handclapping/"),
+    #          (r"E:\MoSIFT\dataset\KTH/handwaving/",
+    #           r"E:\MoSIFT\dataset\csv/handwaving/"),
+    #          (r"E:\MoSIFT\dataset\KTH/jogging/",
+    #           r"E:\MoSIFT\dataset\csv/jogging/"),
+    #          (r"E:\MoSIFT\dataset\KTH/walking/",
+    #           r"E:\MoSIFT\dataset\csv/walking/")]
 
     for path, target in paths:
         run_feature_extractor(path, target, 0.7, 1, False, 0.2)
