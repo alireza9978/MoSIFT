@@ -1,4 +1,4 @@
-import math
+import numpy as np
 
 cells = [15, 31, 47, 63, 79, 95, 111, 127, 143, 159, 175, 191, 207, 223, 239, 255]
 
@@ -107,6 +107,17 @@ def gen_arc_histogram(direction, histogram):
     elif 315 < direction <= 360:
         histogram[7] += 1
     return histogram
+
+
+def unpack_octave(keypoint):
+    """Compute octave, layer, and scale from a keypoint
+    """
+    octave = keypoint.octave & 255
+    layer = (keypoint.octave >> 8) & 255
+    if octave >= 128:
+        octave = octave | -128
+    scale = 1 / np.float32(1 << octave) if octave >= 0 else np.float32(1 << -octave)
+    return octave, layer, scale
 
 
 if __name__ == '__main__':
