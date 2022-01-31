@@ -49,6 +49,22 @@ def has_sufficient_motion(key_points_xy, key_points, descriptors, p1, lambda_val
     return sm_key_points_xy, sm_key_points, sm_descriptors
 
 
+def get_direction(a, b):
+    dx = (a.T[0] - b.T[0])
+    dy = -(a.T[1] - b.T[1])
+    if dx == 0:
+        dx = 0.00001
+    direction = np.arctan(dy / dx)
+    if dx < 0 < dy:
+        direction = math.pi + direction
+    if dx < 0 and dy < 0:
+        direction = math.pi + direction
+    if dx > 0 > dy:
+        direction = (2 * math.pi) + direction
+    direction = direction * 180 / math.pi
+    return direction
+
+
 def gen_hof(x, y, frame, next_frame):
     hof = []
     histogram = [0, 0, 0, 0, 0, 0, 0, 0]
@@ -58,18 +74,7 @@ def gen_hof(x, y, frame, next_frame):
 
     for i in range(len(p1)):
         if st[i]:
-            dx = (p1[i].T[0] - neighbors[i].T[0])
-            dy = -(p1[i].T[1] - neighbors[i].T[1])
-            if dx == 0:
-                dx = 0.00001
-            direction = np.arctan(dy / dx)
-            if dx < 0 < dy:
-                direction = math.pi + direction
-            if dx < 0 and dy < 0:
-                direction = math.pi + direction
-            if dx > 0 > dy:
-                direction = (2 * math.pi) + direction
-            direction = direction * 180 / math.pi
+            direction = get_direction(p1[i], neighbors[i])
             histogram = util.gen_arc_histogram(direction, histogram)
 
         if i in util.cells:
@@ -91,9 +96,9 @@ def gen_mosift_features(video_data, lambda_value, interval, sample_size):
         if len(key_points) == 0:
             continue
         key_points_xy = cv.KeyPoint_convert(key_points)
-        p1, st, err = cv.calcOpticalFlowPyrLK(frame, next_frame, key_points_xy, None, **lk_params)
+        target_key_points_xy, _, _ = cv.calcOpticalFlowPyrLK(frame, next_frame, key_points_xy, None, **lk_params)
         sm_key_points_xy, sm_key_points, sm_descriptors = has_sufficient_motion(key_points_xy, key_points, descriptors,
-                                                                                p1, lambda_value)
+                                                                                target_key_points_xy, lambda_value)
 
         for j in range(len(sm_key_points)):
             hof = np.array(gen_hof(sm_key_points_xy[j][0], sm_key_points_xy[j][1], frame, next_frame))
