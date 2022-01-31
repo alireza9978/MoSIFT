@@ -3,6 +3,7 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import euclidean_distances
 
@@ -11,14 +12,11 @@ from src.load_dataset import load_all_features
 g = 0.1
 
 
-def h_navid(point_a, point_b):
+def distance_cost(row):
+    from_pt_x, from_pt_y, from_pt_f, to_pt_x, to_pt_y, to_pt_f = row.values
+    point_a, point_b = np.array([[from_pt_x, from_pt_y, from_pt_f]]), np.array([[to_pt_x, to_pt_y, to_pt_f]])
     distance = euclidean_distances(point_a, point_b)
     return np.exp(-g * distance)[0][0]
-
-
-def alireza_to_navid(row):
-    from_pt_x, from_pt_y, from_pt_f, to_pt_x, to_pt_y, to_pt_f = row.values
-    return h_navid(np.array([[from_pt_x, from_pt_y, from_pt_f]]), np.array([[to_pt_x, to_pt_y, to_pt_f]]))
 
 
 def gen_histogram(temp_df: pd.DataFrame):
@@ -31,18 +29,18 @@ def gen_histogram(temp_df: pd.DataFrame):
 def get_adjacency_matrix(temp_df: pd.DataFrame):
     temp_labels = temp_df["word_label"]
     temp_labels = temp_labels.reset_index(drop=True)
-    points = temp_df.drop(columns=[259, 260, "word_label"])
+    points = temp_df.drop(columns=["video", "category", "word_label"])
     points = points.reset_index(drop=True)
     result = pairwise_distances(points, metric=word_neighbor, n_jobs=1)
     result[np.eye(result.shape[0], dtype=bool)] = 0
     y, x = np.where(result == 1)
     result_df = pd.DataFrame(
-        {"from": temp_labels[x].values, "to": temp_labels[y].values, "from_pt_x": points.loc[x, 256].values,
-         "from_pt_y": points.loc[x, 257].values, "from_pt_f": points.loc[x, 258].values,
-         "to_pt_x": points.loc[y, 256].values, "to_pt_y": points.loc[y, 257].values,
-         "to_pt_f": points.loc[y, 258].values})
-    result_df["video"] = temp_df[259].values[0]
-    result_df["category"] = temp_df[260].values[0]
+        {"from": temp_labels[x].values, "to": temp_labels[y].values, "from_pt_x": points.loc[x, "x"].values,
+         "from_pt_y": points.loc[x, "y"].values, "from_pt_f": points.loc[x, "frame"].values,
+         "to_pt_x": points.loc[y, "x"].values, "to_pt_y": points.loc[y, "y"].values,
+         "to_pt_f": points.loc[y, "frame"].values})
+    result_df["video"] = temp_df["video"].values[0]
+    result_df["category"] = temp_df["category"].values[0]
     return result_df
 
 
@@ -64,12 +62,10 @@ def inner_generate_bi_gram_histogram(temp_df: pd.DataFrame):
 
 
 def generate_bi_gram_histogram(temp_spatio_temporal_df):
-    adjacency_matrix = apply_parallel(temp_spatio_temporal_df.groupby([259, 260]), get_adjacency_matrix)
-    # adjacency_matrix = temp_spatio_temporal_df.groupby([259, 260]).apply(get_adjacency_matrix)
+    adjacency_matrix = apply_parallel(temp_spatio_temporal_df.groupby(["video", "category"]), get_adjacency_matrix)
     tf = adjacency_matrix.groupby(["from", "to"]).size()
 
     df = apply_parallel(adjacency_matrix.groupby(["video", "category"]), vectorise)
-    # df = adjacency_matrix.groupby(["video", "category"]).apply(vectorise)
     df = df.groupby(["from", "to"]).size()
     tf_idf_matrix = adjacency_matrix.set_index(["from", "to"])
     tf_idf_matrix["tf"] = tf
@@ -87,7 +83,7 @@ def generate_bi_gram_histogram(temp_spatio_temporal_df):
     adjacency_matrix["from-to"] = adjacency_matrix["from"].astype(str) + "-" + adjacency_matrix["to"].astype(str)
     adjacency_matrix = adjacency_matrix[adjacency_matrix["from-to"].isin(grouped_tf_idf_matrix["from-to"])]
     adjacency_matrix["weight"] = adjacency_matrix[['from_pt_x', 'from_pt_y', 'from_pt_f',
-                                                   'to_pt_x', 'to_pt_y', 'to_pt_f']].apply(alireza_to_navid, axis=1)
+                                                   'to_pt_x', 'to_pt_y', 'to_pt_f']].apply(distance_cost, axis=1)
     temp_bi_gram_histogram = adjacency_matrix.groupby(["video", "category"]).apply(inner_generate_bi_gram_histogram)
     temp_bi_gram_histogram = temp_bi_gram_histogram.reset_index("from-to")
     temp_bi_gram_histogram = pd.pivot_table(temp_bi_gram_histogram, values=['weight'], index=["video", "category"],
@@ -103,24 +99,27 @@ def apply_parallel(data_frame_grouped, func):
 
 
 if __name__ == '__main__':
+    spatio_temporal_columns = ["x", "y", "frame", "video", "category"]
+
     data_frame, labels = load_all_features()
-    spatio_temporal_df = data_frame[[256, 257, 258, 259, 260]]
-    data_frame.drop(columns=[256, 257, 258, 259, 260], inplace=True)
+    data_frame.rename(columns={256: "x", 257: "y", 258: "frame"}, inplace=True)
+    spatio_temporal_df = data_frame[spatio_temporal_columns]
+    data_frame.drop(columns=spatio_temporal_columns, inplace=True)
     data_frame.fillna(data_frame.mean(), inplace=True)
 
     print("# data loaded")
 
-    # clustering_model = MiniBatchKMeans(n_clusters=500, batch_size=32)
-    # clustering_model.fit(data_frame)
-    # word_label = clustering_model.predict(data_frame)
-    # np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
-    word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
+    clustering_model = MiniBatchKMeans(n_clusters=500, batch_size=32)
+    clustering_model.fit(data_frame)
+    word_label = clustering_model.predict(data_frame)
+    np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
+    # word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
     print("# clustered")
 
     spatio_temporal_df = spatio_temporal_df.reset_index(drop=True)
     spatio_temporal_df["prediction"] = pd.Series(word_label, index=spatio_temporal_df.index)
-    vector_bag_of_word_histogram = spatio_temporal_df[[259, 260, "prediction"]].groupby([259, 260]).apply(gen_histogram)
-    vector_bag_of_word_histogram.index = vector_bag_of_word_histogram.index.rename({259: "video", 260: "category"})
+    vector_bag_of_word_histogram = spatio_temporal_df[["video", "category", "prediction"]].groupby(
+        ["video", "category"]).apply(gen_histogram)
 
     print("# Histogram of features generated")
 
