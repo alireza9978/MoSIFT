@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.neighbors import NearestNeighbors, NearestCentroid
@@ -17,15 +18,15 @@ if __name__ == '__main__':
 
     result = []
     for i in range(100):
-        X_train, X_test, y_train, y_test = train_test_split(df, label, test_size=0.10, random_state=i)
+        X_train, X_test, y_train, y_test = train_test_split(df, label, test_size=0.20, random_state=i)
 
-        scaler = StandardScaler()
-        scaler.fit(X_train)  # Don't cheat - fit only on training data
-        X_train = scaler.transform(X_train)
-        X_test = scaler.transform(X_test)
+        # scaler = StandardScaler()
+        # scaler.fit(X_train)  # Don't cheat - fit only on training data
+        # X_train = scaler.transform(X_train)
+        # X_test = scaler.transform(X_test)
 
-        model = make_pipeline(StandardScaler(), OneVsRestClassifier(SVC()))
-        # model = SVC()
+        # model = make_pipeline(StandardScaler(), OneVsRestClassifier(SVC()))
+        model =RandomForestClassifier()
         # model = SGDClassifier()
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)

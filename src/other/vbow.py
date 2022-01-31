@@ -3,18 +3,22 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import euclidean_distances
 
 from src.load_dataset import load_all_features
 
-g = 1
+g = 0.1
 
 
 def h_navid(point_a, point_b):
     distance = euclidean_distances(point_a, point_b)
-    return np.exp(-g * distance)
+    return np.exp(-g * distance)[0][0]
+
+
+def alireza_to_navid(row):
+    from_pt_x, from_pt_y, from_pt_f, to_pt_x, to_pt_y, to_pt_f = row.values
+    return h_navid(np.array([[from_pt_x, from_pt_y, from_pt_f]]), np.array([[to_pt_x, to_pt_y, to_pt_f]]))
 
 
 def gen_histogram(temp_df: pd.DataFrame):
@@ -30,12 +34,13 @@ def get_adjacency_matrix(temp_df: pd.DataFrame):
     points = temp_df.drop(columns=[259, 260, "word_label"])
     points = points.reset_index(drop=True)
     result = pairwise_distances(points, metric=word_neighbor, n_jobs=1)
-    result = result[~np.eye(result.shape[0], dtype=bool)].reshape(result.shape[0], -1)
-    x, y = np.where(result == 1)
+    result[np.eye(result.shape[0], dtype=bool)] = 0
+    y, x = np.where(result == 1)
     result_df = pd.DataFrame(
-        {"from": temp_labels[x].values, "to": temp_labels[y].values, "from_pt_x": points.loc[x, 256],
-         "from_pt_y": points.loc[x, 257], "from_pt_f": points.loc[x, 258], "to_pt_x": points.loc[y, 256],
-         "to_pt_y": points.loc[y, 257], "to_pt_f": points.loc[y, 258]})
+        {"from": temp_labels[x].values, "to": temp_labels[y].values, "from_pt_x": points.loc[x, 256].values,
+         "from_pt_y": points.loc[x, 257].values, "from_pt_f": points.loc[x, 258].values,
+         "to_pt_x": points.loc[y, 256].values, "to_pt_y": points.loc[y, 257].values,
+         "to_pt_f": points.loc[y, 258].values})
     result_df["video"] = temp_df[259].values[0]
     result_df["category"] = temp_df[260].values[0]
     return result_df
@@ -55,7 +60,7 @@ def vectorise(temp_list):
 
 
 def inner_generate_bi_gram_histogram(temp_df: pd.DataFrame):
-    return temp_df.groupby(["from-to"]).size()
+    return temp_df[["from-to", "weight"]].groupby(["from-to"]).sum()
 
 
 def generate_bi_gram_histogram(temp_spatio_temporal_df):
@@ -68,19 +73,24 @@ def generate_bi_gram_histogram(temp_spatio_temporal_df):
     df = df.groupby(["from", "to"]).size()
     tf_idf_matrix = adjacency_matrix.set_index(["from", "to"])
     tf_idf_matrix["tf"] = tf
-    tf_idf_matrix = tf_idf_matrix.reset_index().set_index(["from", "to", "video", "category"])
+    tf_idf_matrix = tf_idf_matrix.reset_index().set_index(["from", "to"])
     tf_idf_matrix["df"] = df
     tf_idf_matrix = tf_idf_matrix.reset_index()
-    tf_idf_matrix["tf_idf"] = tf_idf_matrix["tf"] / tf_idf_matrix["df"]
-    tf_idf_matrix = tf_idf_matrix[["from", "to", "tf_idf"]].groupby(["from", "to"]).first().reset_index()
-    tf_idf_matrix = tf_idf_matrix.sort_values("tf_idf", ascending=False)
-    tf_idf_matrix = tf_idf_matrix.iloc[:200][['from', "to"]].reset_index(drop=True)
-    tf_idf_matrix["from-to"] = tf_idf_matrix["from"].astype(str) + "-" + tf_idf_matrix["to"].astype(str)
+    n = adjacency_matrix.groupby(["video", "category"]).size().shape[0]
+    tf_idf_matrix["tf_idf"] = tf_idf_matrix["tf"] * np.log(n / tf_idf_matrix["df"])
+
+    grouped_tf_idf_matrix = tf_idf_matrix[["from", "to", "tf_idf"]].groupby(["from", "to"]).first().reset_index()
+    grouped_tf_idf_matrix = grouped_tf_idf_matrix.sort_values("tf_idf", ascending=False)
+    grouped_tf_idf_matrix = grouped_tf_idf_matrix.iloc[:200][['from', "to"]].reset_index(drop=True)
+    grouped_tf_idf_matrix["from-to"] = grouped_tf_idf_matrix["from"].astype(str) + "-" + grouped_tf_idf_matrix[
+        "to"].astype(str)
     adjacency_matrix["from-to"] = adjacency_matrix["from"].astype(str) + "-" + adjacency_matrix["to"].astype(str)
-    adjacency_matrix = adjacency_matrix[adjacency_matrix["from-to"].isin(tf_idf_matrix["from-to"])]
+    adjacency_matrix = adjacency_matrix[adjacency_matrix["from-to"].isin(grouped_tf_idf_matrix["from-to"])]
+    adjacency_matrix["weight"] = adjacency_matrix[['from_pt_x', 'from_pt_y', 'from_pt_f',
+                                                   'to_pt_x', 'to_pt_y', 'to_pt_f']].apply(alireza_to_navid, axis=1)
     temp_bi_gram_histogram = adjacency_matrix.groupby(["video", "category"]).apply(inner_generate_bi_gram_histogram)
     temp_bi_gram_histogram = temp_bi_gram_histogram.reset_index("from-to")
-    temp_bi_gram_histogram = pd.pivot_table(temp_bi_gram_histogram, values=[0], index=["video", "category"],
+    temp_bi_gram_histogram = pd.pivot_table(temp_bi_gram_histogram, values=['weight'], index=["video", "category"],
                                             columns=["from-to"], aggfunc=np.sum).fillna(0)
 
     return temp_bi_gram_histogram
@@ -100,11 +110,11 @@ if __name__ == '__main__':
 
     print("# data loaded")
 
-    clustering_model = MiniBatchKMeans(n_clusters=200, batch_size=32)
-    clustering_model.fit(data_frame)
-    word_label = clustering_model.predict(data_frame)
-    np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
-    # word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
+    # clustering_model = MiniBatchKMeans(n_clusters=500, batch_size=32)
+    # clustering_model.fit(data_frame)
+    # word_label = clustering_model.predict(data_frame)
+    # np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
+    word_label = np.loadtxt('../../dataset/word_label.csv', delimiter=',').astype(int)
     print("# clustered")
 
     spatio_temporal_df = spatio_temporal_df.reset_index(drop=True)
