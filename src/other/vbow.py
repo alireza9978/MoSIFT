@@ -3,7 +3,7 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import euclidean_distances
 
@@ -52,7 +52,7 @@ def word_neighbor(x, y):
         return 0
 
 
-def vectorise(temp_list):
+def get_uniques(temp_list):
     result = temp_list[["from", "to"]].groupby(["from", "to"]).size().reset_index()
     return result[["from", "to"]]
 
@@ -62,10 +62,11 @@ def inner_generate_bi_gram_histogram(temp_df: pd.DataFrame):
 
 
 def generate_bi_gram_histogram(temp_spatio_temporal_df):
-    adjacency_matrix = apply_parallel(temp_spatio_temporal_df.groupby(["video", "category"]), get_adjacency_matrix)
-    tf = adjacency_matrix.groupby(["from", "to"]).size()
 
-    df = apply_parallel(adjacency_matrix.groupby(["video", "category"]), vectorise)
+    adjacency_matrix = apply_parallel(temp_spatio_temporal_df.groupby(["video", "category"]), get_adjacency_matrix)
+
+    tf = adjacency_matrix.groupby(["from", "to"]).size()
+    df = apply_parallel(adjacency_matrix.groupby(["video", "category"]), get_uniques)
     df = df.groupby(["from", "to"]).size()
     tf_idf_matrix = adjacency_matrix.set_index(["from", "to"])
     tf_idf_matrix["tf"] = tf
@@ -82,6 +83,7 @@ def generate_bi_gram_histogram(temp_spatio_temporal_df):
         "to"].astype(str)
     adjacency_matrix["from-to"] = adjacency_matrix["from"].astype(str) + "-" + adjacency_matrix["to"].astype(str)
     adjacency_matrix = adjacency_matrix[adjacency_matrix["from-to"].isin(grouped_tf_idf_matrix["from-to"])]
+
     adjacency_matrix["weight"] = adjacency_matrix[['from_pt_x', 'from_pt_y', 'from_pt_f',
                                                    'to_pt_x', 'to_pt_y', 'to_pt_f']].apply(distance_cost, axis=1)
     temp_bi_gram_histogram = adjacency_matrix.groupby(["video", "category"]).apply(inner_generate_bi_gram_histogram)
@@ -109,7 +111,7 @@ if __name__ == '__main__':
 
     print("# data loaded")
 
-    clustering_model = MiniBatchKMeans(n_clusters=500, batch_size=32)
+    clustering_model = KMeans(n_clusters=600)
     clustering_model.fit(data_frame)
     word_label = clustering_model.predict(data_frame)
     np.savetxt('../../dataset/word_label.csv', word_label, delimiter=',')
