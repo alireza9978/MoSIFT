@@ -1,13 +1,16 @@
-import cv2 as cv
-import pandas as pd
-import numpy as np
-from tslearn.clustering import TimeSeriesKMeans
-from tslearn.utils import to_time_series, to_time_series_dataset
-from tslearn.svm import TimeSeriesSVC
 from src.load_dataset import load_all
-from tslearn.neighbors import KNeighborsTimeSeriesClassifier
+
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis, skew
+
+import multiprocessing
+
+import cv2 as cv
+import numpy as np
+import pandas as pd
+from joblib import Parallel, delayed
+
+kernel = np.ones((4, 4), np.uint8)
 
 
 def plot_image(temp_image):
@@ -28,30 +31,28 @@ def get_speed_mean(temp_df: pd.DataFrame):
     return temp_df[["mean_speed_x", "mean_speed_y"]].dropna().mean()
 
 
-if __name__ == '__main__':
-    dataset, label = load_all()
-    kernel = np.ones((4, 4), np.uint8)
+def generate_position(video_number, video_data):
+    temp_video, category = video_data
+    human_positions_df = pd.DataFrame()
+    for temp_image in temp_video:
+        temp_image = cv.inRange(temp_image, 0, 50)
+        temp_image = cv.dilate(temp_image, kernel, iterations=1)
+        x, y = np.where(temp_image == 255)
+        human_points_df = pd.DataFrame({"x": x, "y": y})
+        human_position = human_points_df.mean()
+        if x.shape[0] != 0:
+            height = x.max() - x.min()
+            width = y.max() - y.min()
+            human_position["height"] = height
+            human_position["width"] = width
+            human_position["percent"] = x.shape[0] / (temp_image.shape[0] * temp_image.shape[1])
+        human_positions_df = human_positions_df.append(human_position, ignore_index=True)
+    human_positions_df["video"] = video_number
+    human_positions_df["category"] = category
+    return human_positions_df
 
-    humans_positions_df = pd.DataFrame()
-    for index, video in enumerate(dataset):
-        human_positions_df = pd.DataFrame()
-        for img in video:
-            img = cv.inRange(img, 0, 50)
-            img = cv.dilate(img, kernel, iterations=1)
-            x, y = np.where(img == 255)
-            human_points_df = pd.DataFrame({"x": x, "y": y})
-            human_position = human_points_df.mean()
-            if x.shape[0] != 0:
-                height = x.max() - x.min()
-                width = y.max() - y.min()
-                human_position["height"] = height
-                human_position["width"] = width
-                human_position["percent"] = x.shape[0] / (img.shape[0] * img.shape[1])
-            human_positions_df = human_positions_df.append(human_position, ignore_index=True)
-        human_positions_df["video"] = index
-        human_positions_df["category"] = label[index]
-        humans_positions_df = humans_positions_df.append(human_positions_df)
 
+def generate_features_df(humans_positions_df):
     feature_df = pd.DataFrame(index=pd.Series(np.arange(dataset.shape[0]), name="video"))
 
     moving_human = humans_positions_df.groupby("video").apply(lambda temp: temp[["x", "y"]].isna().any().any())
@@ -69,4 +70,23 @@ if __name__ == '__main__':
     feature_df = feature_df.join(human_speed, how="outer")
     feature_df = feature_df.join(statistical_features, how="outer")
     feature_df = feature_df.join(other_statistical_features, how="outer")
-    feature_df.to_csv("../../dataset/main_final_features.csv")
+    return feature_df
+
+
+if __name__ == '__main__':
+    dataset, label = load_all()
+
+    print("data loaded")
+
+    result = Parallel(n_jobs=int(multiprocessing.cpu_count() - 2))(
+        delayed(generate_position)(count, video_data_label) for count, video_data_label in
+        enumerate(zip(dataset, label)))
+    temp_humans_positions_df = pd.concat(result)
+
+    print("position extracted")
+
+    temp_feature_df = generate_features_df(temp_humans_positions_df)
+
+    print("features generated")
+
+    temp_feature_df.to_csv("../../dataset/main_final_features.csv")
