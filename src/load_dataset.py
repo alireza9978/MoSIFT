@@ -57,6 +57,7 @@ def load_all():
         label = np.concatenate([label, np.array([index] * temp_dataset.shape[0])])
 
     dataset = np.array(dataset)
+    label = label.astype(int)
     return dataset, label
 
 

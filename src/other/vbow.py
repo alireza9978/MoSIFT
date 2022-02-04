@@ -20,7 +20,7 @@ def distance_cost(row):
 
 
 def gen_histogram(temp_df: pd.DataFrame):
-    histogram = np.zeros(500)
+    histogram = np.zeros(600)
     for k in temp_df["prediction"]:
         histogram[k] += 1.0
     return pd.Series(histogram)
