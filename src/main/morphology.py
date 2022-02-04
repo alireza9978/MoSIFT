@@ -52,6 +52,14 @@ def generate_position(video_number, video_data):
     return human_positions_df
 
 
+def generate_momentum(temp_df: pd.DataFrame):
+    temp_df["speed_x"] = np.abs(temp_df['x'] - temp_df['x'].shift(1)) / 120
+    temp_df["speed_y"] = np.abs(temp_df['y'] - temp_df['y'].shift(1)) / 160
+    temp_df["speed"] = np.sqrt(np.square(temp_df["speed_y"]) + np.square(temp_df["speed_x"]))
+    temp_df["momentum"] = temp_df["speed"] * temp_df["percent"] * 100
+    return temp_df["momentum"]
+
+
 def generate_features_df(humans_positions_df):
     feature_df = pd.DataFrame(index=pd.Series(np.arange(dataset.shape[0]), name="video"))
 
@@ -60,6 +68,12 @@ def generate_features_df(humans_positions_df):
 
     human_speed = humans_positions_df.dropna().groupby(['video', 'category']).apply(get_speed)
     human_speed = human_speed.dropna().groupby(['video', 'category']).apply(get_speed_mean)
+
+    momentum = humans_positions_df[['x', 'y', 'percent'] + ['video', 'category']].groupby(['video', 'category']).apply(
+        generate_momentum)
+    humans_positions_df = humans_positions_df.reset_index().set_index(['video', 'category', "index"]).join(
+        momentum.reset_index().rename(columns={"level_2": "index"}).set_index(['video', 'category', "index"]))
+    humans_positions_df = humans_positions_df.reset_index().drop(columns=["index"])
 
     statistical_features = humans_positions_df.drop(columns=['x', 'y']).groupby(['video', 'category']).agg(
         [np.mean, np.min, np.max, np.std, np.var])
