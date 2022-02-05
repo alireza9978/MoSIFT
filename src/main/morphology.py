@@ -98,8 +98,8 @@ def generate_momentum(temp_df: pd.DataFrame):
 def generate_features_df(humans_positions_df):
     feature_df = pd.DataFrame(index=pd.Series(np.arange(dataset.shape[0]), name="video"))
 
-    moving_human = humans_positions_df.groupby("video").apply(lambda temp: temp[["x", "y"]].isna().any().any())
-    moving_human.name = "motion"
+    always_in = humans_positions_df.groupby("video").apply(lambda temp: temp[["x", "y"]].isna().any().any())
+    always_in.name = "always_in"
 
     human_speed = humans_positions_df.dropna().groupby(['video', 'category']).apply(get_speed)
     human_speed = human_speed.dropna().groupby(['video', 'category']).apply(get_speed_mean)
@@ -115,7 +115,7 @@ def generate_features_df(humans_positions_df):
     other_statistical_features = humans_positions_df.drop(columns=['x', 'y']).dropna().groupby(
         ['video', 'category']).agg([skew, kurtosis])
 
-    feature_df = feature_df.join(moving_human, how="outer")
+    feature_df = feature_df.join(always_in, how="outer")
     feature_df = feature_df.join(human_speed, how="outer")
     feature_df = feature_df.join(statistical_features, how="outer")
     feature_df = feature_df.join(other_statistical_features, how="outer")
