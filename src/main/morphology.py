@@ -48,9 +48,10 @@ def get_binary_image(temp_image):
     segments = np.unique(labeled)
     total = np.zeros((segments.shape[0], 1), dtype=float)
     count = np.zeros(total.shape, dtype=float)
-    for i, temp_label in enumerate(labeled):
-        total[temp_label] = total[temp_label] + flat_image[i]
-        count[temp_label] += 1
+    for segment in segments:
+        this_segment_index = labeled == segment
+        total[segment] = labeled[this_segment_index].sum()
+        count[segment] = this_segment_index.sum()
     avg = total / count
     avg = np.uint8(avg)
 
@@ -58,7 +59,6 @@ def get_binary_image(temp_image):
     human = avg < 70
     avg[human] = 255
     avg[~human] = 0
-
     # cast the labeled image into the corresponding average color
     res = avg[labeled]
     temp_result = res.reshape(temp_image.shape)
@@ -67,6 +67,7 @@ def get_binary_image(temp_image):
 
 
 def generate_position(video_number, video_data):
+    print("# progress: " + str(video_number + 1) + '/' + str(total_videos))
     temp_video, category = video_data
     human_positions_df = pd.DataFrame()
     for temp_image in temp_video:
@@ -123,7 +124,7 @@ def generate_features_df(humans_positions_df):
 
 if __name__ == '__main__':
     dataset, label = load_all()
-
+    total_videos = dataset.shape[0]
     print("data loaded")
 
     result = Parallel(n_jobs=int(multiprocessing.cpu_count() - 2))(
