@@ -1,3 +1,5 @@
+from sklearn.cluster import estimate_bandwidth, MeanShift
+
 from src.load_dataset import load_all
 
 import matplotlib.pyplot as plt
@@ -10,7 +12,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
-kernel = np.ones((4, 4), np.uint8)
+kernel = np.ones((3, 3), np.uint8)
 
 
 def plot_image(temp_image):
@@ -31,12 +33,44 @@ def get_speed_mean(temp_df: pd.DataFrame):
     return temp_df[["mean_speed_x", "mean_speed_y"]].dropna().mean()
 
 
+def get_binary_image(temp_image):
+    # filter to reduce noise
+    temp_image = cv.medianBlur(temp_image, 3)
+    flat_image = temp_image.reshape((-1, 1))
+    flat_image = np.float32(flat_image)
+
+    # mean shift
+    bandwidth = estimate_bandwidth(flat_image, quantile=.06, n_samples=3000)
+    ms = MeanShift(bandwidth=bandwidth, max_iter=800, bin_seeding=True)
+    ms.fit(flat_image)
+    labeled = ms.labels_
+
+    segments = np.unique(labeled)
+    total = np.zeros((segments.shape[0], 1), dtype=float)
+    count = np.zeros(total.shape, dtype=float)
+    for i, temp_label in enumerate(labeled):
+        total[temp_label] = total[temp_label] + flat_image[i]
+        count[temp_label] += 1
+    avg = total / count
+    avg = np.uint8(avg)
+
+    # select human parts
+    human = avg < 70
+    avg[human] = 255
+    avg[~human] = 0
+
+    # cast the labeled image into the corresponding average color
+    res = avg[labeled]
+    temp_result = res.reshape(temp_image.shape)
+    temp_result = cv.dilate(temp_result, kernel, iterations=1)
+    return temp_result
+
+
 def generate_position(video_number, video_data):
     temp_video, category = video_data
     human_positions_df = pd.DataFrame()
     for temp_image in temp_video:
-        temp_image = cv.inRange(temp_image, 0, 50)
-        temp_image = cv.dilate(temp_image, kernel, iterations=1)
+        temp_image = get_binary_image(temp_image)
         x, y = np.where(temp_image == 255)
         human_points_df = pd.DataFrame({"x": x, "y": y})
         human_position = human_points_df.mean()
